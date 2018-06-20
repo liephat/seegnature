@@ -59,16 +59,15 @@ class Container:
         return train_features, train_labels, test_features, test_labels
 
 
-def read_eeg_data_from_folder(participant, path_folders):
-    path_participant = path_folders + "\\" + participant
+def read_eeg_data_from_folder(dataset, datasets_path):
+    dataset_path = os.path.abspath(os.path.join(datasets_path, dataset))
 
-    files_participant = os.listdir(path_participant)
+    dataset_files = os.listdir(dataset_path)
 
     current_trial_no = 0
     trials_data = {}
-    print("-------------------------------------")
-    print("Participant ID " + participant + ", record files:")
-    for file in files_participant:
+    print("Dataset ID " + dataset + ", record files:")
+    for file in dataset_files:
         if (file.endswith(".dat") and "S101" in file) or (
                     file.endswith(".dat") and "S102" in file) or (
                     file.endswith(".dat") and "S103" in file) or (
@@ -76,7 +75,8 @@ def read_eeg_data_from_folder(participant, path_folders):
             target_class = get_target_class(file)
             congruency = get_congruency(file)
 
-            channels_data = read_data(file, path_participant)
+            file_path = os.path.abspath(os.path.join(dataset_path, file))
+            channels_data = read_data(file_path)
             trials_new_data = restructure_data(channels_data, target_class, congruency, current_trial_no)
 
             current_trial_no = current_trial_no + len(trials_new_data)
@@ -122,7 +122,7 @@ def get_congruency(filename_in):
     return congruency
 
 
-def read_data(file_name, path):
+def read_data(file_path):
     """ Reads data from generic data format file (.dat) and creates a dictionary with channel name as key and
     a list of 150 scan points big chunks as value.
     :param file_name: File name of generic data format file
@@ -130,8 +130,7 @@ def read_data(file_name, path):
     :return: Dictionary with channel name as key and list of 150 scan points big chunks which is the
     size of a trial as value
     """
-
-    data_file = open(path + "\\" + file_name, "r")
+    data_file = open(file_path, "r")
     channels = {}
     for line in data_file:
         ch = line[:7]
