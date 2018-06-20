@@ -8,12 +8,12 @@ import random
 class Container:
     data = {}
 
-    def __init__(self, path, n_classes=2):
+    def __init__(self, path, data_points, n_classes=2):
         self.n_classes = n_classes
-        participant_folders = os.listdir(path)
+        dataset_folders = os.listdir(path)
 
-        for participant in participant_folders:
-            self.data[participant] = read_eeg_data_from_folder(participant, path)
+        for dataset in dataset_folders:
+            self.data[dataset] = read_eeg_data_from_folder(dataset, path, data_points)
 
 
     def create_features_and_labels(self, channels, test_size=0.1, one_hot=True):
@@ -59,7 +59,7 @@ class Container:
         return train_features, train_labels, test_features, test_labels
 
 
-def read_eeg_data_from_folder(dataset, datasets_path):
+def read_eeg_data_from_folder(dataset, datasets_path, data_points):
     dataset_path = os.path.abspath(os.path.join(datasets_path, dataset))
 
     dataset_files = os.listdir(dataset_path)
@@ -76,11 +76,11 @@ def read_eeg_data_from_folder(dataset, datasets_path):
             congruency = get_congruency(file)
 
             file_path = os.path.abspath(os.path.join(dataset_path, file))
-            channels_data = read_data(file_path)
+            channels_data = read_data(file_path, data_points)
             trials_new_data = restructure_data(channels_data, target_class, congruency, current_trial_no)
 
             current_trial_no = current_trial_no + len(trials_new_data)
-            print(file + ", " + str(len(trials_new_data)) + " trials")
+            print(file + ", " + str(len(trials_new_data)) + " trial(s)")
 
             trials_data.update(trials_new_data)
     print("Total: " + str(current_trial_no))
@@ -122,7 +122,7 @@ def get_congruency(filename_in):
     return congruency
 
 
-def read_data(file_path):
+def read_data(file_path, data_points):
     """ Reads data from generic data format file (.dat) and creates a dictionary with channel name as key and
     a list of 150 scan points big chunks as value.
     :param file_name: File name of generic data format file
@@ -139,7 +139,7 @@ def read_data(file_path):
 
         values = line[7:].split()
 
-        channels[ch] = list(chunks(values, 150))
+        channels[ch] = list(chunks(values, data_points))
     data_file.close()
 
     return channels
