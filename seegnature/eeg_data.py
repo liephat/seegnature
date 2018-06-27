@@ -58,6 +58,14 @@ class Container:
 
         return train_features, train_labels, test_features, test_labels
 
+    def add_participant_data(self, subject_data):
+        for participant in self.data:
+            for trial in self.data[participant]:
+                for time_point in self.data[participant][trial]:
+                    for key in subject_data:
+                        if self.data[participant][trial][time_point]['Participant_ID'] in subject_data[key]['Subject_ID']:
+                            self.data[participant][trial][time_point]['Consc'] = subject_data[key]['Consc']
+
 
 def read_eeg_data_from_folder(dataset, datasets_path, data_points):
     dataset_path = os.path.abspath(os.path.join(datasets_path, dataset))
@@ -72,12 +80,14 @@ def read_eeg_data_from_folder(dataset, datasets_path, data_points):
                     file.endswith(".dat") and "S102" in file) or (
                     file.endswith(".dat") and "S103" in file) or (
                     file.endswith(".dat") and "S104" in file):
+
+            participant_id = get_participant_id(file)
             target_class = get_target_class(file)
             congruency = get_congruency(file)
 
             file_path = os.path.abspath(os.path.join(dataset_path, file))
             channels_data = read_data(file_path, data_points)
-            trials_new_data = restructure_data(channels_data, target_class, congruency, current_trial_no)
+            trials_new_data = restructure_data(channels_data, participant_id, target_class, congruency, current_trial_no)
 
             current_trial_no = current_trial_no + len(trials_new_data)
             print(file + ", " + str(len(trials_new_data)) + " trial(s)")
@@ -122,6 +132,16 @@ def get_congruency(filename_in):
     return congruency
 
 
+def get_participant_id(filename_in):
+    """
+    Gets participant id from context specific stimulus code.
+    :param filename_in: File name of generic data format file
+    :return: Participant ID
+    """
+
+    return filename_in[0:8]
+
+
 def read_data(file_path, data_points):
     """ Reads data from generic data format file (.dat) and creates a dictionary with channel name as key and
     a list of 150 scan points big chunks as value.
@@ -133,11 +153,11 @@ def read_data(file_path, data_points):
     data_file = open(file_path, "r")
     channels = {}
     for line in data_file:
-        ch = line[:7]
+        ch = line[:6]
         ch = ch.strip()
         ch = ch.replace(" ", "_")
 
-        values = line[7:].split()
+        values = line[6:].split()
 
         channels[ch] = list(chunks(values, data_points))
     data_file.close()
@@ -145,11 +165,12 @@ def read_data(file_path, data_points):
     return channels
 
 
-def restructure_data(channels, target_class, congruency, current_trial_no):
+def restructure_data(channels, participant_id, target_class, congruency, current_trial_no):
     """
     Converts wide data format read from generic data format file to a long data format where each line represents a
     time point of a trial and columns are channel data.
     :param channels: Dictionary with channel name as key and list of trials
+    :param participant_id: String participant id
     :param target_class: Number code for target class (1 = correct, 0 = error)
     :param congruency: Number code for type of congruency (1 = congruent, 0 = not congruent)
     :param current_trial_no: Number of the current trial of the participant
@@ -175,6 +196,7 @@ def restructure_data(channels, target_class, congruency, current_trial_no):
                     trials_tmp_data[current_trial_no + i][j]['Time_point'] = j
                     trials_tmp_data[current_trial_no + i][j]['Class'] = target_class
                     trials_tmp_data[current_trial_no + i][j]['Congruency'] = congruency
+                    trials_tmp_data[current_trial_no + i][j]['Participant_ID'] = participant_id
 
                 time_point = time_point.replace(",", ".")
                 trials_tmp_data[current_trial_no + i][j][ch] = time_point
