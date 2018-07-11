@@ -58,13 +58,14 @@ class Container:
 
         return train_features, train_labels, test_features, test_labels
 
-    def add_participant_data(self, subject_data):
+    def add_participant_data(self, subject_data, variables):
         for participant in self.data:
             for trial in self.data[participant]:
                 for time_point in self.data[participant][trial]:
                     for key in subject_data:
                         if self.data[participant][trial][time_point]['Participant_ID'] in subject_data[key]['Subject_ID']:
-                            self.data[participant][trial][time_point]['Consc'] = subject_data[key]['Consc']
+                            for variable in variables:
+                                self.data[participant][trial][time_point][variable] = subject_data[key][variable]
 
 
 def read_eeg_data_from_folder(dataset, datasets_path, data_points):

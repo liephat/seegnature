@@ -9,13 +9,13 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 class SeparabilityIndex:
     data = {}
 
-    def __init__(self, name, trial_data, channels):
+    def __init__(self, name, trial_data, channels, variable, correlation_type):
         self.name = name
-        SeparabilityIndex.create(self, trial_data, channels)
+        SeparabilityIndex.create(self, trial_data, channels, variable, correlation_type)
 
 
-    def create(self, trial_data, channels):
-        target_class = np.array([])
+    def create(self, trial_data, channels, variable, correlation_type):
+        target_variable = np.array([])
         spatio_temporal_data = {}
 
         for time_point in trial_data[1].keys():
@@ -24,7 +24,7 @@ class SeparabilityIndex:
                 spatio_temporal_data[time_point][channel] = np.array([])
 
         for trial in trial_data.keys():
-            target_class = np.append(target_class, trial_data[trial][time_point]['Class'])
+            target_variable = np.append(target_variable, trial_data[trial][time_point][variable])
             for time_point in trial_data[trial].keys():
 
                 for channel in channels:
@@ -35,7 +35,12 @@ class SeparabilityIndex:
             self.data[time_point] = {}
 
             for channel in spatio_temporal_data[time_point]:
-                r = stats.pointbiserialr(target_class, spatio_temporal_data[time_point][channel].astype(np.float))
+                if correlation_type is 'pointbiserial':
+                    r = stats.pointbiserialr(target_variable, spatio_temporal_data[time_point][channel].astype(np.float))
+                if correlation_type is 'pearson':
+                    r = stats.pearsonr(target_variable.astype(np.float), spatio_temporal_data[time_point][channel].astype(np.float))
+                else:
+                    raise ValueError('Not a valid correlation type')
                 self.data[time_point][channel] = r[0]
 
 
