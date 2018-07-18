@@ -46,6 +46,7 @@ class SeparabilityIndex:
 
     def save_as_heatmap(self, path_out, channels):
         time_points = self.data.keys()
+        number_time_points = len(time_points)
         # helper array for pcolormesh
         channel_numbers = []
         i = 1
@@ -76,16 +77,20 @@ class SeparabilityIndex:
         fig, ax = plt.subplots(figsize=(15, 5))
         ax.set_yticks(np.arange(1, len(channels), 1) + 0.5, minor=False)
         ax.set_yticklabels(channel_labels)
-        ax.set_xticks(np.arange(0, 150, 25) + 0.5, minor=False)
-        ax.set_xticks(np.arange(0, 150, 5) + 0.5, minor=True)
-        ax.set_xticklabels(np.arange(-100, 500, 100))
+        ax.set_xticks(np.arange(0, number_time_points, 25) + 0.5, minor=False)
+        ax.set_xticks(np.arange(0, number_time_points, 5) + 0.5, minor=True)
+        ax.set_xticklabels(np.arange(-100, (number_time_points-25)*4, 100))
         ax.set_xlabel("[ms]")
         ax.set_ylabel("channel")
         ax.set_title("SI of " + self.name)
         ax.set_aspect('equal', adjustable='box')
         ax.tick_params(axis='both', which='major', labelsize=12)
 
-        mesh = ax.pcolormesh(time_points, channel_numbers, np.swapaxes(correlations, 0, 1))
+        # pick the desired colormap, sensible levels, and define a normalization
+        # instance which takes data values and translates those into levels.
+        cmap = plt.get_cmap('RdBu')
+
+        mesh = ax.pcolormesh(time_points, channel_numbers, np.swapaxes(correlations, 0, 1), cmap=cmap)
 
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size="2%", pad=0.05)
