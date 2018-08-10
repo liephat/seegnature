@@ -1,17 +1,23 @@
 __author__ = "Mike"
 
 from collections import OrderedDict
+import os
+import pickle
 import numpy as np
 from scipy import stats
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 class SeparabilityIndex:
-    data = {}
 
-    def __init__(self, name, trial_data, channels, variable, correlation_type):
+    def __init__(self, name, raw_data, channels, variable, correlation_type):
+        self.data = {}
         self.name = name
-        SeparabilityIndex.create(self, trial_data, channels, variable, correlation_type)
+        self.raw_data = raw_data
+        self.channels = channels
+        self.variable = variable
+        self.correlation_type = correlation_type
+        SeparabilityIndex.create(self, raw_data, channels, variable, correlation_type)
 
 
     def create(self, trial_data, channels, variable, correlation_type):
@@ -44,19 +50,19 @@ class SeparabilityIndex:
                 self.data[time_point][channel] = r[0]
 
 
-    def save_as_heatmap(self, path_out, channels):
+    def save_as_heatmap(self, path_out):
         time_points = self.data.keys()
         number_time_points = len(time_points)
         # helper array for pcolormesh
         channel_numbers = []
         i = 1
-        for channel in channels:
+        for channel in self.channels:
             channel_numbers.append(i)
             i = i + 1
 
         correlations = []
         for time_point in self.data:
-            correlations.append([self.data[time_point][channel] for channel in channels])
+            correlations.append([self.data[time_point][channel] for channel in self.channels])
 
         # setup the 2D grid with Numpy
         time_points, channel_numbers = np.meshgrid(list(time_points), np.asarray(channel_numbers))
@@ -68,14 +74,14 @@ class SeparabilityIndex:
         channel_labels = []
         # channel_wanted = channels
         channel_wanted = ['Fz', 'FCz', 'Cz', 'Pz']
-        for channel in channels:
+        for channel in self.channels:
             if channel in channel_wanted:
                 channel_labels.append(channel)
             else:
                 channel_labels.append('')
 
         fig, ax = plt.subplots(figsize=(15, 5))
-        ax.set_yticks(np.arange(1, len(channels), 1) + 0.5, minor=False)
+        ax.set_yticks(np.arange(1, len(self.channels), 1) + 0.5, minor=False)
         ax.set_yticklabels(channel_labels)
         ax.set_xticks(np.arange(0, number_time_points, 25) + 0.5, minor=False)
         ax.set_xticks(np.arange(0, number_time_points, 5) + 0.5, minor=True)
@@ -101,6 +107,12 @@ class SeparabilityIndex:
         plt.savefig(file_out, dpi=200)
 
         print("Saved separability diagram to " + file_out)
+
+
+    def pickle(self, path):
+        file = os.path.abspath(os.path.join(path, self.name + '.pkl'))
+        with open(file, 'wb') as pickle_file:
+            pickle.dump(self, pickle_file)
 
 
 def extract_features(trial_data, time_periods, channels):

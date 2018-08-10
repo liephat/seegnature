@@ -6,9 +6,9 @@ import random
 
 
 class Container:
-    data = {}
 
     def __init__(self, path, data_points, n_classes=2):
+        self.data = {}
         self.n_classes = n_classes
         dataset_folders = os.listdir(path)
 
