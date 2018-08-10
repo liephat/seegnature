@@ -68,14 +68,17 @@ class Container:
                                 self.data[participant][trial][time_point][variable] = subject_data[key][variable]
 
 
-def read_eeg_data_from_folder(dataset, datasets_path, data_points):
+def read_eeg_data_from_folder(dataset, datasets_path, data_points, verbose=False):
     dataset_path = os.path.abspath(os.path.join(datasets_path, dataset))
 
     dataset_files = os.listdir(dataset_path)
 
     current_trial_no = 0
     trials_data = {}
-    print("Dataset ID " + dataset + ", record files:")
+
+    if verbose:
+        print("Dataset ID %s, record files:" % dataset)
+
     for file in dataset_files:
         if (file.endswith(".dat") and "S101" in file) or (
                     file.endswith(".dat") and "S102" in file) or (
@@ -91,10 +94,15 @@ def read_eeg_data_from_folder(dataset, datasets_path, data_points):
             trials_new_data = restructure_data(channels_data, participant_id, target_class, congruency, current_trial_no)
 
             current_trial_no = current_trial_no + len(trials_new_data)
-            print(file + ", " + str(len(trials_new_data)) + " trial(s)")
+            if verbose:
+                print(file + ", " + str(len(trials_new_data)) + " trial(s)")
 
             trials_data.update(trials_new_data)
-    print("Total: " + str(current_trial_no))
+    if verbose:
+        print("Total: %d" % current_trial_no)
+    else:
+        print("Dataset ID: %s, record files: %d" % (dataset, current_trial_no))
+
     return trials_data
 
 
