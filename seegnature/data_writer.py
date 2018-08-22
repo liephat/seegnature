@@ -18,7 +18,7 @@ def write_trial_data(trials, filename_out, path_out):
     with open(file_out, "w") as csv_file:
 
         fieldnames = trials[1][1].keys()
-        # fieldnames = ['Trial', 'Class', 'Time_point', 'Congruency', 'Fp1', 'Fp2', 'F7', 'F3', 'Fz', 'F4', 'F8', 'FC5',
+        # fieldnames = ['ID', 'Class', 'Time_point', 'Congruency', 'Fp1', 'Fp2', 'F7', 'F3', 'Fz', 'F4', 'F8', 'FC5',
         #               'FCz', 'FC6', 'T7', 'C3', 'Cz', 'C4', 'T8', 'CP5', 'CP1', 'CP2', 'CP6', 'P7', 'P3', 'Pz', 'P4',
         #               'P8', 'O1', 'O2', 'LM', 'RM', 'heog_li', 'heog_re', 'veog']
         writer = csv.DictWriter(csv_file, fieldnames=fieldnames, lineterminator='\n')

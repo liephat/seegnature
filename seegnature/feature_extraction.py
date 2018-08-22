@@ -10,41 +10,41 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 class SeparabilityIndex:
 
-    def __init__(self, name, raw_data, channels, variable, correlation_type):
+    def __init__(self, name, raw_data, channels, target_variable, correlation_type):
         self.data = {}
         self.name = name
         self.raw_data = raw_data
         self.channels = channels
-        self.variable = variable
+        self.target_variable = target_variable
         self.correlation_type = correlation_type
-        SeparabilityIndex.create(self, raw_data, channels, variable, correlation_type)
+        SeparabilityIndex.create(self, raw_data, channels, target_variable, correlation_type)
 
 
-    def create(self, trial_data, channels, variable, correlation_type):
-        target_variable = np.array([])
+    def create(self, raw_data, channels, target_variable, correlation_type):
+        targets = np.array([])
         spatio_temporal_data = {}
 
-        for time_point in trial_data[1].keys():
+        for time_point in raw_data[1].keys():
             spatio_temporal_data[time_point] = {}
             for channel in channels:
                 spatio_temporal_data[time_point][channel] = np.array([])
 
-        for trial in trial_data.keys():
-            target_variable = np.append(target_variable, trial_data[trial][time_point][variable])
-            for time_point in trial_data[trial].keys():
+        for trial in raw_data.keys():
+            targets = np.append(targets, raw_data[trial][time_point][target_variable])
+            for time_point in raw_data[trial].keys():
 
                 for channel in channels:
                     spatio_temporal_data[time_point][channel] = np.append(spatio_temporal_data[time_point][channel],
-                                                                          trial_data[trial][time_point][channel])
+                                                                          raw_data[trial][time_point][channel])
 
         for time_point in spatio_temporal_data:
             self.data[time_point] = {}
 
             for channel in spatio_temporal_data[time_point]:
                 if correlation_type is 'pointbiserial':
-                    r = stats.pointbiserialr(target_variable, spatio_temporal_data[time_point][channel].astype(np.float))
+                    r = stats.pointbiserialr(targets, spatio_temporal_data[time_point][channel].astype(np.float))
                 if correlation_type is 'pearson':
-                    r = stats.pearsonr(target_variable.astype(np.float), spatio_temporal_data[time_point][channel].astype(np.float))
+                    r = stats.pearsonr(targets.astype(np.float), spatio_temporal_data[time_point][channel].astype(np.float))
                 else:
                     raise ValueError('Not a valid correlation type')
                 self.data[time_point][channel] = r[0]
@@ -115,35 +115,35 @@ class SeparabilityIndex:
             pickle.dump(self, pickle_file)
 
 
-def extract_features(trial_data, time_periods, channels):
+    def extract_features(self, time_periods, channels, target_variable):
 
-    extracted_features = {}
+        extracted_features = {}
 
-    for trial in trial_data:
+        for case in self.raw_data:
 
-        extracted_features[trial] = LastUpdatedOrderedDict()
-        extracted_features[trial]['Trial'] = trial
-        extracted_features[trial]['Class'] = trial_data[trial][1]['Class']
+            extracted_features[case] = LastUpdatedOrderedDict()
+            extracted_features[case]['ID'] = case
+            extracted_features[case][target_variable] = self.raw_data[case][1][target_variable]
 
-        for time_period in time_periods:
-            begin = time_period[0]
-            end = time_period[1]
-            # get time points within range defined by begin and end
-            time_points = np.arange(begin, end + 1, 1)
+            for time_period in time_periods:
+                begin = time_period[0]
+                end = time_period[1]
+                # get time points within range defined by begin and end
+                time_points = np.arange(begin, end + 1, 1)
 
-            for channel in channels:
-                sum = 0.0
-                for time_point in time_points:
-                    sum = sum + float(trial_data[trial][time_point][channel])
+                for channel in channels:
+                    sum = 0.0
+                    for time_point in time_points:
+                        sum = sum + float(self.raw_data[case][time_point][channel])
 
-                avg = sum / len(time_points)
+                    avg = sum / len(time_points)
 
-                variable_name = str(channel) + "_" + str(begin) + "-" + str(end)
-                extracted_features[trial][variable_name] = avg
+                    variable_name = str(channel) + "_" + str(begin) + "-" + str(end)
+                    extracted_features[case][variable_name] = avg
 
-    # OrderedDict(sorted(d.items(), key=lambda t: t[0]))
+        # OrderedDict(sorted(d.items(), key=lambda t: t[0]))
 
-    return extracted_features
+        return extracted_features
 
 
 class LastUpdatedOrderedDict(OrderedDict):

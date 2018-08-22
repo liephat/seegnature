@@ -201,7 +201,7 @@ def restructure_data(channels, participant_id, target_class, congruency, current
             for time_point in trial:
                 if j not in trials_tmp_data[current_trial_no + i]:
                     trials_tmp_data[current_trial_no + i][j] = {}
-                    trials_tmp_data[current_trial_no + i][j]['Trial'] = current_trial_no + i
+                    trials_tmp_data[current_trial_no + i][j]['ID'] = current_trial_no + i
                     trials_tmp_data[current_trial_no + i][j]['Time_point'] = j
                     trials_tmp_data[current_trial_no + i][j]['Class'] = target_class
                     trials_tmp_data[current_trial_no + i][j]['Congruency'] = congruency
