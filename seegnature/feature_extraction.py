@@ -12,6 +12,7 @@ class SeparabilityIndex:
 
     def __init__(self, name, raw_data, channels, target_variable, correlation_type):
         self.data = {}
+        self.extracted_features = {}
         self.name = name
         self.raw_data = raw_data
         self.channels = channels
@@ -117,13 +118,11 @@ class SeparabilityIndex:
 
     def extract_features(self, time_periods, channels, target_variable):
 
-        extracted_features = {}
-
         for case in self.raw_data:
 
-            extracted_features[case] = LastUpdatedOrderedDict()
-            extracted_features[case]['ID'] = case
-            extracted_features[case][target_variable] = self.raw_data[case][1][target_variable]
+            self.extracted_features[case] = LastUpdatedOrderedDict()
+            self.extracted_features[case]['ID'] = case
+            self.extracted_features[case][target_variable] = self.raw_data[case][1][target_variable]
 
             for time_period in time_periods:
                 begin = time_period[0]
@@ -139,11 +138,33 @@ class SeparabilityIndex:
                     avg = sum / len(time_points)
 
                     variable_name = str(channel) + "_" + str(begin) + "-" + str(end)
-                    extracted_features[case][variable_name] = avg
+                    self.extracted_features[case][variable_name] = avg
 
         # OrderedDict(sorted(d.items(), key=lambda t: t[0]))
 
-        return extracted_features
+        return self.extracted_features
+
+
+    def get_features_and_labels(self, target_variable=None):
+
+        features = self.extracted_features
+        if target_variable is None:
+            target_variable = self.target_variable
+
+        if target_variable in features[1].keys():
+            # stack labels into nparray
+            y = np.hstack((features[case][target_variable] for case in features))
+            y = y.astype(np.float64)
+            y = y - 1
+
+            # stack features into nparray
+            X = np.vstack((np.hstack(features[case][feature] for feature in features[case].keys()) for case in features))
+            X = np.delete(X, [0, 1], axis=1)
+            X = X.astype(np.float64)
+
+            return X, y
+        else:
+            raise ValueError('Not a valid target variable')
 
 
 class LastUpdatedOrderedDict(OrderedDict):
