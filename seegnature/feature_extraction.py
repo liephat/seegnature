@@ -43,15 +43,15 @@ class SeparabilityIndex:
 
             for channel in spatio_temporal_data[time_point]:
                 if correlation_type is 'pointbiserial':
-                    r = stats.pointbiserialr(targets, spatio_temporal_data[time_point][channel].astype(np.float))
-                if correlation_type is 'pearson':
+                    r = stats.pointbiserialr(targets.astype(np.float), spatio_temporal_data[time_point][channel].astype(np.float))
+                elif correlation_type is 'pearson':
                     r = stats.pearsonr(targets.astype(np.float), spatio_temporal_data[time_point][channel].astype(np.float))
                 else:
                     raise ValueError('Not a valid correlation type')
                 self.data[time_point][channel] = r[0]
 
 
-    def save_as_heatmap(self, path_out):
+    def make_heatmap(self):
         time_points = self.data.keys()
         number_time_points = len(time_points)
         # helper array for pcolormesh
@@ -104,10 +104,19 @@ class SeparabilityIndex:
 
         fig.colorbar(mesh, cax=cax)  # need a colorbar to show the intensity scale
 
-        file_out = path_out + "\\" + self.name + ".png"
-        plt.savefig(file_out, dpi=200)
+        self.heatmap = plt
 
-        print("Saved separability diagram to " + file_out)
+
+    def show_heatmap(self):
+        self.make_heatmap()
+        self.heatmap.show()
+
+
+    def save_heatmap(self, path):
+        file = os.path.abspath(os.path.join(path, self.name + ".png"))
+        self.make_heatmap()
+        self.heatmap.savefig(file, dpi=200)
+        print("Saved separability diagram to " + file)
 
 
     def pickle(self, path):
@@ -165,6 +174,16 @@ class SeparabilityIndex:
             return X, y
         else:
             raise ValueError('Not a valid target variable')
+
+
+def load_separability_index(directory, name):
+    file = os.path.abspath(os.path.join(directory, name + '.pkl'))
+
+    with open(file, 'rb') as pickle_file:
+        separability_index = pickle.load(pickle_file)
+
+    print('Separability index %s loaded.' % name)
+    return separability_index
 
 
 class LastUpdatedOrderedDict(OrderedDict):
