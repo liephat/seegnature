@@ -127,6 +127,9 @@ class SeparabilityIndex:
 
     def extract_features(self, time_periods, channels, target_variable):
 
+        # transform time period from ms (which is more user-friendly) to scan points (which is the technical representation)
+        time_periods = np.around(np.array(time_periods) / 4 + 25)
+
         for case in self.raw_data:
 
             self.extracted_features[case] = LastUpdatedOrderedDict()
