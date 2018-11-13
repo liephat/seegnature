@@ -6,6 +6,7 @@ import pickle
 import numpy as np
 from scipy import stats
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 class SeparabilityIndex:
@@ -95,9 +96,13 @@ class SeparabilityIndex:
 
         # pick the desired colormap, sensible levels, and define a normalization
         # instance which takes data values and translates those into levels.
-        cmap = plt.get_cmap('RdBu')
 
-        mesh = ax.pcolormesh(time_points, channel_numbers, np.swapaxes(correlations, 0, 1), cmap=cmap)
+        c = mcolors.ColorConverter().to_rgb
+        rwb = make_colormap([c('red'), c('white'), 0.33, c('white'), 0.66, c('white'), c('blue')])
+        # cmap = plt.get_cmap('RdBu')
+        # cmap = plt.get_cmap('seismic')
+
+        mesh = ax.pcolormesh(time_points, channel_numbers, np.swapaxes(correlations, 0, 1), cmap=rwb)
 
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size="2%", pad=0.05)
@@ -177,6 +182,33 @@ class SeparabilityIndex:
             return X, y
         else:
             raise ValueError('Not a valid target variable')
+
+
+    def save_extracted_features_to_txt(self, path):
+
+        features = self.extracted_features
+        X = np.vstack((np.hstack(features[case][feature] for feature in features[case].keys()) for case in features))
+        X = X.astype(np.float32)
+
+        file = os.path.abspath(os.path.join(path, self.name + '.txt'))
+        np.savetxt(file, X)
+
+
+def make_colormap(seq):
+    """Return a LinearSegmentedColormap
+        seq: a sequence of floats and RGB-tuples. The floats should be increasing
+        and in the interval (0,1).
+        """
+    seq = [(None,) * 3, 0.0] + list(seq) + [1.0, (None,) * 3]
+    cdict = {'red': [], 'green': [], 'blue': []}
+    for i, item in enumerate(seq):
+        if isinstance(item, float):
+            r1, g1, b1 = seq[i - 1]
+            r2, g2, b2 = seq[i + 1]
+            cdict['red'].append([item, r1, r2])
+            cdict['green'].append([item, g1, g2])
+            cdict['blue'].append([item, b1, b2])
+    return mcolors.LinearSegmentedColormap('CustomMap', cdict)
 
 
 def load_separability_index(directory, name):
