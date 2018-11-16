@@ -6,7 +6,6 @@ import pickle
 import numpy as np
 from scipy import stats
 import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 class SeparabilityIndex:
@@ -52,7 +51,7 @@ class SeparabilityIndex:
                 self.data[time_point][channel] = r[0]
 
 
-    def make_heatmap(self):
+    def make_heatmap(self, cmap):
         time_points = self.data.keys()
         number_time_points = len(time_points)
         # helper array for pcolormesh
@@ -74,7 +73,7 @@ class SeparabilityIndex:
 
         # define channel labels
         channel_labels = []
-        # channel_wanted = channels
+        # channel_wanted = self.channels
         channel_wanted = ['Fz', 'FCz', 'Cz', 'Pz']
         for channel in self.channels:
             if channel in channel_wanted:
@@ -97,12 +96,7 @@ class SeparabilityIndex:
         # pick the desired colormap, sensible levels, and define a normalization
         # instance which takes data values and translates those into levels.
 
-        c = mcolors.ColorConverter().to_rgb
-        rwb = make_colormap([c('red'), c('white'), 0.33, c('white'), 0.66, c('white'), c('blue')])
-        # cmap = plt.get_cmap('RdBu')
-        # cmap = plt.get_cmap('seismic')
-
-        mesh = ax.pcolormesh(time_points, channel_numbers, np.swapaxes(correlations, 0, 1), cmap=rwb)
+        mesh = ax.pcolormesh(time_points, channel_numbers, np.swapaxes(correlations, 0, 1), cmap=cmap)
 
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size="2%", pad=0.05)
@@ -112,15 +106,15 @@ class SeparabilityIndex:
         self.heatmap = plt
 
 
-    def show_heatmap(self):
-        self.make_heatmap()
+    def show_heatmap(self, cmap='RdBu_r'):
+        self.make_heatmap(cmap)
         self.heatmap.show()
 
 
-    def save_heatmap(self, path):
+    def save_heatmap(self, path, cmap='RdBu_r'):
         file = os.path.abspath(os.path.join(path, self.name + ".png"))
-        self.make_heatmap()
-        self.heatmap.savefig(file, dpi=200)
+        self.make_heatmap(cmap)
+        self.heatmap.savefig(file, dpi=300)
         print("Saved separability diagram to " + file)
 
 
@@ -192,23 +186,6 @@ class SeparabilityIndex:
 
         file = os.path.abspath(os.path.join(path, self.name + '.txt'))
         np.savetxt(file, X)
-
-
-def make_colormap(seq):
-    """Return a LinearSegmentedColormap
-        seq: a sequence of floats and RGB-tuples. The floats should be increasing
-        and in the interval (0,1).
-        """
-    seq = [(None,) * 3, 0.0] + list(seq) + [1.0, (None,) * 3]
-    cdict = {'red': [], 'green': [], 'blue': []}
-    for i, item in enumerate(seq):
-        if isinstance(item, float):
-            r1, g1, b1 = seq[i - 1]
-            r2, g2, b2 = seq[i + 1]
-            cdict['red'].append([item, r1, r2])
-            cdict['green'].append([item, g1, g2])
-            cdict['blue'].append([item, b1, b2])
-    return mcolors.LinearSegmentedColormap('CustomMap', cdict)
 
 
 def load_separability_index(directory, name):
