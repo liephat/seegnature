@@ -7,13 +7,13 @@ import random
 
 class Container:
 
-    def __init__(self, path, data_points, n_classes=2):
+    def __init__(self, path, data_points, begin, n_classes=2):
         self.data = {}
         self.n_classes = n_classes
         dataset_folders = os.listdir(path)
 
         for dataset in dataset_folders:
-            self.data[dataset] = read_eeg_data_from_folder(dataset, path, data_points)
+            self.data[dataset] = read_eeg_data_from_folder(dataset, path, data_points, begin)
 
 
     def create_features_and_labels(self, channels, test_size=0.1, one_hot=True):
@@ -58,17 +58,30 @@ class Container:
 
         return train_features, train_labels, test_features, test_labels
 
+
     def merge_data(self, identifier, data, variables):
-        for participant in self.data:
-            for trial in self.data[participant]:
-                for time_point in self.data[participant][trial]:
+        for dataset in self.data:
+            for case in self.data[dataset]:
+                for time_point in self.data[dataset][case]:
                     for key in data:
-                        if self.data[participant][trial][time_point][identifier[0]] in data[key][identifier[1]]:
+                        if self.data[dataset][case][time_point][identifier[0]] in data[key][identifier[1]]:
                             for variable in variables:
-                                self.data[participant][trial][time_point][variable] = data[key][variable]
+                                self.data[dataset][case][time_point][variable] = data[key][variable]
 
 
-def read_eeg_data_from_folder(dataset, datasets_path, data_points, verbose=False):
+    def add_variable_to_dataset(self, dataset, name, value):
+        for case in self.data[dataset]:
+            for time_point in self.data[dataset][case]:
+                self.data[dataset][case][time_point][name] = value
+
+
+    def merge_datasets(self, a, b, name):
+        self.data[name] = merge_two_dicts(self.data[a], self.data[b])
+        del self.data[a]
+        del self.data[b]
+
+
+def read_eeg_data_from_folder(dataset, datasets_path, data_points, begin, verbose=False):
     dataset_path = os.path.abspath(os.path.join(datasets_path, dataset))
 
     dataset_files = os.listdir(dataset_path)
@@ -80,17 +93,14 @@ def read_eeg_data_from_folder(dataset, datasets_path, data_points, verbose=False
         print("Dataset ID %s, record files:" % dataset)
 
     for file in dataset_files:
-        if (file.endswith(".dat") and "S101" in file) or (
-                    file.endswith(".dat") and "S102" in file) or (
-                    file.endswith(".dat") and "S103" in file) or (
-                    file.endswith(".dat") and "S104" in file):
+        if file.endswith(".dat"):
 
             participant_id = get_participant_id(file)
             target_class = get_target_class(file)
             congruency = get_congruency(file)
 
             file_path = os.path.abspath(os.path.join(dataset_path, file))
-            channels_data = read_data(file_path, data_points)
+            channels_data = read_data(file_path, data_points, begin)
             trials_new_data = restructure_data(channels_data, participant_id, target_class, congruency, current_trial_no)
 
             current_trial_no = current_trial_no + len(trials_new_data)
@@ -151,24 +161,26 @@ def get_participant_id(filename_in):
     return filename_in[0:8]
 
 
-def read_data(file_path, data_points):
+def read_data(file_path, data_points, begin):
     """ Reads data from generic data format file (.dat) and creates a dictionary with channel name as key and
     a list of 150 scan points big chunks as value.
     :param file_name: File name of generic data format file
     :param path: Path to generic data format file
+    :param begin:
     :return: Dictionary with channel name as key and list of 150 scan points big chunks which is the
     size of a trial as value
     """
-    data_file = open(file_path, "r")
+    data_file = open(file_path, "r", begin)
     channels = {}
     for line in data_file:
-        ch = line[:6]
+        ch = line[:begin]
         ch = ch.strip()
         ch = ch.replace(" ", "_")
 
-        values = line[6:].split()
+        values = line[begin:].split()
 
-        channels[ch] = list(chunks(values, data_points))
+        if not 'hEOG' in ch:
+            channels[ch] = list(chunks(values, data_points))
     data_file.close()
 
     return channels
@@ -238,3 +250,9 @@ def make_labels_one_hot(labels, n_classes):
         labels_one_hot.append(label_one_hot)
     labels = np.array(labels_one_hot)
     return labels
+
+
+def merge_two_dicts(x, y):
+    z = x.copy()
+    z.update(y)
+    return z
