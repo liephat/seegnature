@@ -10,7 +10,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 class SeparabilityIndex:
 
-    def __init__(self, name, raw_data, channels, target_variable, correlation_type):
+    def __init__(self, name, raw_data, channels, target_variable, correlation_type, alpha=False):
         self.data = {}
         self.extracted_features = {}
         self.name = name
@@ -18,18 +18,29 @@ class SeparabilityIndex:
         self.channels = channels
         self.target_variable = target_variable
         self.correlation_type = correlation_type
-        SeparabilityIndex.create(self, raw_data, channels, target_variable, correlation_type)
+        SeparabilityIndex.create(self, raw_data, channels, target_variable, correlation_type, alpha)
 
 
-    def create(self, raw_data, channels, target_variable, correlation_type):
+    def create(self, raw_data, channels, target_variable, correlation_type, alpha):
+
+        # NOTE: The following code is a complicated way to restructure the raw data which was read from brainvision files
+        # and create a three-dimensional data structure (x: time, y: channel, z: trials) by help of dictionaries and arrays.
+        # The data structure is used to calculate the separability measures for each time and channel combination.
+        # Data handling would be much easier when building a three-dimensional data structure by help of one numpy array.
+        # TODO: Convert data structure to a numpy array.
+
+        # Initialize empty array for targets and dictionary for spatio temporal data matrix
         targets = np.array([])
         spatio_temporal_data = {}
 
+        # initialize empty dictionaries for each time point with channels as keys and
+        # initialiize empty arrays for each channel per time point of spatio temporal data matrix
         for time_point in raw_data[1].keys():
             spatio_temporal_data[time_point] = {}
             for channel in channels:
                 spatio_temporal_data[time_point][channel] = np.array([])
 
+        # fill targets array with target data and fill spatio temporal data structure with data from all trials
         for trial in raw_data.keys():
             targets = np.append(targets, raw_data[trial][time_point][target_variable])
             for time_point in raw_data[trial].keys():
@@ -38,6 +49,7 @@ class SeparabilityIndex:
                     spatio_temporal_data[time_point][channel] = np.append(spatio_temporal_data[time_point][channel],
                                                                           raw_data[trial][time_point][channel])
 
+        # calculate separability measures for all data points of spatio temporal data matrix
         for time_point in spatio_temporal_data:
             self.data[time_point] = {}
 
@@ -48,7 +60,20 @@ class SeparabilityIndex:
                     r = stats.pearsonr(targets.astype(np.float), spatio_temporal_data[time_point][channel].astype(np.float))
                 else:
                     raise ValueError('Not a valid correlation type')
-                self.data[time_point][channel] = r[0]
+
+                if alpha is not False:
+                    if alpha is True:
+                        if r[1] < 0.05:
+                            self.data[time_point][channel] = r[0]
+                        else:
+                            self.data[time_point][channel] = 0
+                    else:
+                        if r[1] < alpha:
+                            self.data[time_point][channel] = r[0]
+                        else:
+                            self.data[time_point][channel] = 0
+                else:
+                    self.data[time_point][channel] = r[0]
 
 
     def make_heatmap(self, cmap):
@@ -96,7 +121,7 @@ class SeparabilityIndex:
         # pick the desired colormap, sensible levels, and define a normalization
         # instance which takes data values and translates those into levels.
 
-        mesh = ax.pcolormesh(time_points, channel_numbers, np.swapaxes(correlations, 0, 1), cmap=cmap)
+        mesh = ax.pcolormesh(time_points, channel_numbers, np.swapaxes(correlations, 0, 1), vmin=-0.45, vmax=0.45, cmap=cmap)
 
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size="2%", pad=0.05)
@@ -114,7 +139,7 @@ class SeparabilityIndex:
     def save_heatmap(self, path, cmap='RdBu_r'):
         file = os.path.abspath(os.path.join(path, self.name + ".png"))
         self.make_heatmap(cmap)
-        self.heatmap.savefig(file, dpi=300)
+        self.heatmap.savefig(file, dpi=300, bbox_inches='tight')
         print("Saved separability diagram to " + file)
 
 
