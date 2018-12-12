@@ -27,8 +27,8 @@ class Container:
         return self.prepare_features_and_labels(merged_data, channels, test_size, one_hot)
 
 
-    def create_features_and_labels_for_participant(self, participant, channels, test_size=0.1, one_hot=True):
-        return self.prepare_features_and_labels(self.data[participant], channels, test_size, one_hot)
+    def create_features_and_labels_for_dataset(self, dataset, channels, test_size=0.1, one_hot=True):
+        return self.prepare_features_and_labels(self.data[dataset], channels, test_size, one_hot)
 
 
     def prepare_features_and_labels(self, data, channels, test_size, one_hot):
@@ -82,11 +82,23 @@ class Container:
 
 
 def read_eeg_data_from_folder(dataset, datasets_path, data_points, begin, verbose=False):
+    """
+    Reads ERP data epochs from folder that contains one or more files that are treated as one dataset. One dataset
+    can comprise one or more files that each contain ERP data of e.g. different trial types of one participant (i.e. one
+    dataset corresponds to one participant) or different participants of one experimental condition (i.e. one dataset
+    corresponds to one experimental condition).
+    :param dataset: String ID of dataset
+    :param datasets_path: Folder path to datasets
+    :param data_points: Number of data points that are included in one ERP data epoch
+    :param begin: Number begin of ERP data stream in a data file
+    :param verbose: Boolean defines the verbosity of data reading process
+    :return: Dictionary with dataset IDs as keys and collected data from data files as values
+    """
     dataset_path = os.path.abspath(os.path.join(datasets_path, dataset))
 
     dataset_files = os.listdir(dataset_path)
 
-    current_trial_no = 0
+    current_trial_id = 0
     trials_data = {}
 
     if verbose:
@@ -101,17 +113,17 @@ def read_eeg_data_from_folder(dataset, datasets_path, data_points, begin, verbos
 
             file_path = os.path.abspath(os.path.join(dataset_path, file))
             channels_data = read_data(file_path, data_points, begin)
-            trials_new_data = restructure_data(channels_data, participant_id, target_class, congruency, current_trial_no)
+            trials_new_data = restructure_data(channels_data, participant_id, target_class, congruency, current_trial_id)
 
-            current_trial_no = current_trial_no + len(trials_new_data)
+            current_trial_id = current_trial_id + len(trials_new_data)
             if verbose:
                 print(file + ", " + str(len(trials_new_data)) + " trial(s)")
 
             trials_data.update(trials_new_data)
     if verbose:
-        print("Total: %d" % current_trial_no)
+        print("Total: %d" % current_trial_id)
     else:
-        print("Dataset ID: %s, record files: %d" % (dataset, current_trial_no))
+        print("Dataset ID: %s, record files: %d" % (dataset, current_trial_id))
 
     return trials_data
 
@@ -170,7 +182,7 @@ def read_data(file_path, data_points, begin):
     :return: Dictionary with channel name as key and list of 150 scan points big chunks which is the
     size of a trial as value
     """
-    data_file = open(file_path, "r", begin)
+    data_file = open(file_path, "r")
     channels = {}
     for line in data_file:
         ch = line[:begin]
@@ -186,50 +198,54 @@ def read_data(file_path, data_points, begin):
     return channels
 
 
-def restructure_data(channels, participant_id, target_class, congruency, current_trial_no):
+def restructure_data(trial_data_wide, dataset_id, target_class, congruency, current_trial_id):
     """
-    Converts wide data format read from generic data format file to a long data format where each line represents a
-    time point of a trial and columns are channel data.
-    :param channels: Dictionary with channel name as key and list of trials
-    :param participant_id: String participant id
+    Converts wide and generic data format read from generic data format file from brainvision analyzer to a long data format
+    where each line represents a time point of a trial and columns are channel data.
+    :param trial_data_wide: Dictionary with channel name as key and list of trials
+    :param dataset_id: String ID of the dataset
     :param target_class: Number code for target class (1 = correct, 0 = error)
     :param congruency: Number code for type of congruency (1 = congruent, 0 = not congruent)
-    :param current_trial_no: Number of the current trial of the participant
+    :param current_trial_id: Number ID of the current trial of the dataset that can be used when dataset has more than one trial
     :return: Dictionary with trial number (as key) and dictionaries (as values) with time point (as key) and
     specific attributes such as trial number, time point, class, congruency types and channels (as values)
     """
-    trials_tmp_data = {}
-    for ch in channels.keys():
+    trial_data_long = {}
+    for ch in trial_data_wide.keys():
 
         i = 1
 
-        for trial in channels[ch]:
+        for trial in trial_data_wide[ch]:
             # check if there is already an entry for the next trial in trials_tmp_data
-            if (current_trial_no + i) not in trials_tmp_data:
-                trials_tmp_data[current_trial_no + i] = {}
+            if (current_trial_id + i) not in trial_data_long:
+                trial_data_long[current_trial_id + i] = {}
 
             j = 1
 
             for time_point in trial:
-                if j not in trials_tmp_data[current_trial_no + i]:
-                    trials_tmp_data[current_trial_no + i][j] = {}
-                    trials_tmp_data[current_trial_no + i][j]['ID'] = current_trial_no + i
-                    trials_tmp_data[current_trial_no + i][j]['Time_point'] = j
-                    trials_tmp_data[current_trial_no + i][j]['Class'] = target_class
-                    trials_tmp_data[current_trial_no + i][j]['Congruency'] = congruency
-                    trials_tmp_data[current_trial_no + i][j]['Participant_ID'] = participant_id
+                if j not in trial_data_long[current_trial_id + i]:
+                    trial_data_long[current_trial_id + i][j] = {}
+                    trial_data_long[current_trial_id + i][j]['ID'] = current_trial_id + i
+                    trial_data_long[current_trial_id + i][j]['Time_point'] = j
+                    trial_data_long[current_trial_id + i][j]['Class'] = target_class
+                    trial_data_long[current_trial_id + i][j]['Congruency'] = congruency
+                    trial_data_long[current_trial_id + i][j]['Participant_ID'] = dataset_id
 
                 time_point = time_point.replace(",", ".")
-                trials_tmp_data[current_trial_no + i][j][ch] = time_point
+                trial_data_long[current_trial_id + i][j][ch] = time_point
 
                 j = j + 1
 
             i = i + 1
 
-    return trials_tmp_data
+    return trial_data_long
 
 
 def print_trials_data(trials_data):
+    """
+    Prints ERP data.
+    :param trials_data: Dictionary of ERP data.
+    """
     for trial in trials_data.keys():
         print(str(trial) + ": ")
         for time_point, ch in trials_data[trial].iteritems():
@@ -243,6 +259,12 @@ def chunks(length, size):
 
 
 def make_labels_one_hot(labels, n_classes):
+    """
+    Takes a list of labels and converts them to one hot labels.
+    :param labels: List of labels
+    :param n_classes: Number of classes
+    :return: Numpy array with one hot labels
+    """
     labels_one_hot = []
     for label in labels:
         label_one_hot = np.zeros(n_classes)
@@ -253,6 +275,12 @@ def make_labels_one_hot(labels, n_classes):
 
 
 def merge_two_dicts(x, y):
+    """
+    Merges two dictionaries to one.
+    :param x: Dictionary 1
+    :param y: Dictionary 2
+    :return: Combined dictionary of dictionaries 1 and 2
+    """
     z = x.copy()
     z.update(y)
     return z
