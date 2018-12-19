@@ -10,10 +10,11 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 class SeparabilityIndex:
 
-    def __init__(self, name, raw_data, channels, target_variable, correlation_type, alpha=False):
+    def __init__(self, name, description, raw_data, channels, target_variable, correlation_type, alpha=False):
         self.data = {}
         self.extracted_features = {}
         self.name = name
+        self.description = description
         self.raw_data = raw_data
         self.channels = channels
         self.target_variable = target_variable
@@ -114,7 +115,7 @@ class SeparabilityIndex:
         ax.set_xticklabels(np.arange(-100, (number_time_points-25)*4, 100))
         ax.set_xlabel("[ms]")
         ax.set_ylabel("channel")
-        ax.set_title("SI of " + self.name)
+        ax.set_title(self.description)
         ax.set_aspect('equal', adjustable='box')
         ax.tick_params(axis='both', which='major', labelsize=12)
 
@@ -176,9 +177,6 @@ class SeparabilityIndex:
                     variable_name = str(channel) + "_" + str(begin) + "-" + str(end)
                     self.extracted_features[case][variable_name] = avg
 
-        # OrderedDict(sorted(d.items(), key=lambda t: t[0]))
-
-        return self.extracted_features
 
 
     def get_features_and_labels(self, target_variable=None):
