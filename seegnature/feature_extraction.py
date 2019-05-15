@@ -137,10 +137,10 @@ class SeparabilityIndex:
         self.heatmap.show()
 
 
-    def save_heatmap(self, path, cmap='RdBu_r'):
-        file = os.path.abspath(os.path.join(path, self.name + ".png"))
+    def save_heatmap(self, path, file_format, cmap='RdBu_r'):
+        file = os.path.abspath(os.path.join(path, self.name + '.' + file_format))
         self.make_heatmap(cmap)
-        self.heatmap.savefig(file, dpi=300, bbox_inches='tight')
+        self.heatmap.savefig(file, format=file_format, dpi=300, bbox_inches='tight')
         print("Saved separability diagram to " + file)
 
 
