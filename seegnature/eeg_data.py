@@ -13,8 +13,7 @@ class Container:
         dataset_folders = os.listdir(path)
 
         for dataset in dataset_folders:
-            self.data[dataset] = read_eeg_data_from_folder(dataset, path, data_points, begin)
-
+            self.data[dataset] = read_eeg_data_from_folder(dataset, path, data_points, begin, verbose=True)
 
     def create_features_and_labels(self, channels, test_size=0.1, one_hot=True):
         merged_data = {}
@@ -69,11 +68,25 @@ class Container:
                                 self.data[dataset][case][time_point][variable] = data[key][variable]
 
 
-    def add_variable_to_dataset(self, dataset, name, value):
+    def add_constant(self, dataset, name, constant):
         for case in self.data[dataset]:
             for time_point in self.data[dataset][case]:
                 self.data[dataset][case][time_point][name] = value
 
+    def add_variable(self, dataset, df, variable):
+        """
+        Inserts a variable from a pandas data frame into a dataset of EEG data container.
+        :param dataset: Name of dataset from EEG data container
+        :param df: Pandas data frame with variable (case in dataset must match index of df)
+        :param variable: Name of variable that will be inserted
+        :return:
+        """
+        if len(self.data[dataset]) > len(df):
+            raise Exception("Number of entries df must be greater or equal than number of cases in dataset.")
+
+        for case in self.data[dataset]:
+            for time_point in self.data[dataset][case]:
+                self.data[dataset][case][time_point][variable] = df.loc[case, variable]
 
     def merge_datasets(self, a, b, name):
         self.data[name] = merge_two_dicts(self.data[a], self.data[b])
@@ -107,13 +120,14 @@ def read_eeg_data_from_folder(dataset, datasets_path, data_points, begin, verbos
     for file in dataset_files:
         if file.endswith(".dat"):
 
-            participant_id = get_participant_id(file)
-            target_class = get_target_class(file)
-            congruency = get_congruency(file)
+            participant_id = guess_participant_id_from_filename(file)
+            target_class = guess_target_class_from_filename(file)
+            congruency = guess_congruency_from_filename(file)
 
             file_path = os.path.abspath(os.path.join(dataset_path, file))
             channels_data = read_data(file_path, data_points, begin)
-            trials_new_data = restructure_data(channels_data, participant_id, target_class, congruency, current_trial_id)
+            trials_new_data = restructure_data(channels_data, participant_id, target_class, congruency,
+                                               current_trial_id)
 
             current_trial_id = current_trial_id + len(trials_new_data)
             if verbose:
@@ -128,7 +142,7 @@ def read_eeg_data_from_folder(dataset, datasets_path, data_points, begin, verbos
     return trials_data
 
 
-def get_target_class(filename_in):
+def guess_target_class_from_filename(filename_in):
     """
     Gets target class of participant data file.
     :param filename_in: File name of generic data format file
@@ -139,11 +153,11 @@ def get_target_class(filename_in):
     elif filename_in[-5] == "c":
         target_class = 1
     else:
-        target_class = -99
+        target_class = None
     return target_class
 
 
-def get_congruency(filename_in):
+def guess_congruency_from_filename(filename_in):
     """
     Gets congruency type from context specific stimulus code.
     :param filename_in: File name of generic data format file
@@ -159,26 +173,26 @@ def get_congruency(filename_in):
     elif trial_type == str(104):
         congruency = 0
     else:
-        congruency = -99
+        congruency = None
     return congruency
 
 
-def get_participant_id(filename_in):
+def guess_participant_id_from_filename(filename_in):
     """
     Gets participant id from context specific stimulus code.
     :param filename_in: File name of generic data format file
     :return: Participant ID
     """
 
-    return filename_in[0:8]
+    return filename_in[0:6]
 
 
 def read_data(file_path, data_points, begin):
     """ Reads data from generic data format file (.dat) and creates a dictionary with channel name as key and
     a list of 150 scan points big chunks as value.
     :param file_name: File name of generic data format file
-    :param path: Path to generic data format file
-    :param begin:
+    :param data_points: Number of data points that are included in one ERP data epoch
+    :param begin: Number begin of ERP data stream in a data file
     :return: Dictionary with channel name as key and list of 150 scan points big chunks which is the
     size of a trial as value
     """
