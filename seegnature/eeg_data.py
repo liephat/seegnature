@@ -25,10 +25,8 @@ class Container:
 
         return self.prepare_features_and_labels(merged_data, channels, test_size, one_hot)
 
-
     def create_features_and_labels_for_dataset(self, dataset, channels, test_size=0.1, one_hot=True):
         return self.prepare_features_and_labels(self.data[dataset], channels, test_size, one_hot)
-
 
     def prepare_features_and_labels(self, data, channels, test_size, one_hot):
         # get size of testing set
@@ -57,7 +55,6 @@ class Container:
 
         return train_features, train_labels, test_features, test_labels
 
-
     def merge_data(self, identifier, data, variables):
         for dataset in self.data:
             for case in self.data[dataset]:
@@ -66,7 +63,6 @@ class Container:
                         if self.data[dataset][case][time_point][identifier[0]] in data[key][identifier[1]]:
                             for variable in variables:
                                 self.data[dataset][case][time_point][variable] = data[key][variable]
-
 
     def add_constant(self, dataset, name, constant):
         for case in self.data[dataset]:
@@ -86,7 +82,7 @@ class Container:
 
         for case in self.data[dataset]:
             for time_point in self.data[dataset][case]:
-                self.data[dataset][case][time_point][variable] = df.loc[case, variable]
+                self.data[dataset][case][time_point][variable] = df.loc[case - 1, variable]
 
     def merge_datasets(self, a, b, name):
         self.data[name] = merge_two_dicts(self.data[a], self.data[b])
@@ -267,7 +263,9 @@ def print_trials_data(trials_data):
 
 
 def chunks(length, size):
-    """Yield successive n-sized chunks from l."""
+    """
+    Yield successive n-sized chunks from l.
+    """
     for i in range(0, len(length), size):
         yield length[i:i + size]
 
