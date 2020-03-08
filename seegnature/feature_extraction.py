@@ -6,21 +6,28 @@ import pickle
 import numpy as np
 from scipy import stats
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+
 
 class SeparabilityIndex:
 
-    def __init__(self, name, description, raw_data, channels, target_variable, correlation_type, alpha=False):
+    def __init__(self, name, raw_data, channels, target_variable, correlation_type='pearson', description=None,
+                 alpha=False):
         self.data = {}
         self.extracted_features = {}
         self.name = name
-        self.description = description
         self.raw_data = raw_data
         self.channels = channels
         self.target_variable = target_variable
         self.correlation_type = correlation_type
-        SeparabilityIndex.create(self, raw_data, channels, target_variable, correlation_type, alpha)
 
+        if description is None:
+            self.description = name
+        else:
+            self.description = description
+
+        SeparabilityIndex.create(self, raw_data, channels, target_variable, correlation_type, alpha)
 
     def create(self, raw_data, channels, target_variable, correlation_type, alpha):
 
@@ -56,9 +63,11 @@ class SeparabilityIndex:
 
             for channel in spatio_temporal_data[time_point]:
                 if correlation_type is 'pointbiserial':
-                    r = stats.pointbiserialr(targets.astype(np.float), spatio_temporal_data[time_point][channel].astype(np.float))
+                    r = stats.pointbiserialr(targets.astype(np.float),
+                                             spatio_temporal_data[time_point][channel].astype(np.float))
                 elif correlation_type is 'pearson':
-                    r = stats.pearsonr(targets.astype(np.float), spatio_temporal_data[time_point][channel].astype(np.float))
+                    r = stats.pearsonr(targets.astype(np.float),
+                                       spatio_temporal_data[time_point][channel].astype(np.float))
                 else:
                     raise ValueError('Not a valid correlation type')
 
@@ -76,8 +85,15 @@ class SeparabilityIndex:
                 else:
                     self.data[time_point][channel] = r[0]
 
+    def make_heatmap(self, cmap=None):
 
-    def make_heatmap(self, cmap):
+        # make default colormap
+        if cmap is None:
+            c = mcolors.ColorConverter().to_rgb
+            cmap = make_colormap(
+                [c('blue'), c('cyan'), 0.3, c('cyan'), c('white'), 0.45, c('white'), 0.55, c('white'), c('yellow'), 0.7,
+                 c('yellow'), c('red')])
+
         time_points = self.data.keys()
         number_time_points = len(time_points)
         # helper array for pcolormesh
@@ -112,7 +128,7 @@ class SeparabilityIndex:
         ax.set_yticklabels(channel_labels)
         ax.set_xticks(np.arange(0, number_time_points, 25) + 0.5, minor=False)
         ax.set_xticks(np.arange(0, number_time_points, 5) + 0.5, minor=True)
-        ax.set_xticklabels(np.arange(-100, (number_time_points-25)*4, 100))
+        ax.set_xticklabels(np.arange(-100, (number_time_points - 25) * 4, 100))
         ax.set_xlabel("[ms]")
         ax.set_ylabel("channel")
         ax.set_title(self.description)
@@ -122,7 +138,8 @@ class SeparabilityIndex:
         # pick the desired colormap, sensible levels, and define a normalization
         # instance which takes data values and translates those into levels.
 
-        mesh = ax.pcolormesh(time_points, channel_numbers, np.swapaxes(correlations, 0, 1), vmin=-0.45, vmax=0.45, cmap=cmap)
+        mesh = ax.pcolormesh(time_points, channel_numbers, np.swapaxes(correlations, 0, 1), vmin=-0.45, vmax=0.45,
+                             cmap=cmap)
 
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size="2%", pad=0.05)
@@ -131,24 +148,20 @@ class SeparabilityIndex:
 
         self.heatmap = plt
 
-
-    def show_heatmap(self, cmap='RdBu_r'):
-        self.make_heatmap(cmap)
+    def show_heatmap(self):
+        self.make_heatmap()
         self.heatmap.show()
 
-
-    def save_heatmap(self, path, file_format, cmap='RdBu_r'):
+    def save_heatmap(self, path, file_format):
         file = os.path.abspath(os.path.join(path, self.name + '.' + file_format))
-        self.make_heatmap(cmap)
+        self.make_heatmap()
         self.heatmap.savefig(file, format=file_format, dpi=300, bbox_inches='tight')
         print("Saved separability diagram to " + file)
-
 
     def pickle(self, path):
         file = os.path.abspath(os.path.join(path, self.name + '.pkl'))
         with open(file, 'wb') as pickle_file:
             pickle.dump(self, pickle_file)
-
 
     def extract_features(self, time_periods, channels, target_variable):
 
@@ -177,8 +190,6 @@ class SeparabilityIndex:
                     variable_name = str(channel) + "_" + str(begin) + "-" + str(end)
                     self.extracted_features[case][variable_name] = avg
 
-
-
     def get_features_and_labels(self, target_variable=None):
 
         features = self.extracted_features
@@ -192,14 +203,14 @@ class SeparabilityIndex:
             y = y - 1
 
             # stack features into nparray
-            X = np.vstack((np.hstack(features[case][feature] for feature in features[case].keys()) for case in features))
+            X = np.vstack(
+                (np.hstack(features[case][feature] for feature in features[case].keys()) for case in features))
             X = np.delete(X, [0, 1], axis=1)
             X = X.astype(np.float64)
 
             return X, y
         else:
             raise ValueError('Not a valid target variable')
-
 
     def save_extracted_features_to_txt(self, path):
 
@@ -219,6 +230,23 @@ def load_separability_index(directory, name):
 
     print('Separability index %s loaded.' % name)
     return separability_index
+
+
+def make_colormap(seq):
+    """
+    Return a LinearSegmentedColormap
+    seq: a sequence of floats and RGB-tuples. The floats should be increasing and in the interval (0,1).
+    """
+    seq = [(None,) * 3, 0.0] + list(seq) + [1.0, (None,) * 3]
+    cdict = {'red': [], 'green': [], 'blue': []}
+    for i, item in enumerate(seq):
+        if isinstance(item, float):
+            r1, g1, b1 = seq[i - 1]
+            r2, g2, b2 = seq[i + 1]
+            cdict['red'].append([item, r1, r2])
+            cdict['green'].append([item, g1, g2])
+            cdict['blue'].append([item, b1, b2])
+    return mcolors.LinearSegmentedColormap('CustomMap', cdict)
 
 
 class LastUpdatedOrderedDict(OrderedDict):

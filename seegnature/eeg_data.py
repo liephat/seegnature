@@ -67,7 +67,7 @@ class Container:
     def add_constant(self, dataset, name, constant):
         for case in self.data[dataset]:
             for time_point in self.data[dataset][case]:
-                self.data[dataset][case][time_point][name] = value
+                self.data[dataset][case][time_point][name] = constant
 
     def add_variable(self, dataset, df, variable):
         """
@@ -185,11 +185,11 @@ def guess_participant_id_from_filename(filename_in):
 
 def read_data(file_path, data_points, begin):
     """ Reads data from generic data format file (.dat) and creates a dictionary with channel name as key and
-    a list of 150 scan points big chunks as value.
+    a list of data_points big chunks as value.
     :param file_name: File name of generic data format file
     :param data_points: Number of data points that are included in one ERP data epoch
     :param begin: Number begin of ERP data stream in a data file
-    :return: Dictionary with channel name as key and list of 150 scan points big chunks which is the
+    :return: Dictionary with channel name as key and list of data_points big chunks which is the
     size of a trial as value
     """
     data_file = open(file_path, "r")
@@ -209,6 +209,7 @@ def read_data(file_path, data_points, begin):
 
 
 def restructure_data(trial_data_wide, dataset_id, target_class, congruency, current_trial_id):
+    # TODO: integrate pandas data frame here
     """
     Converts wide and generic data format read from generic data format file from brainvision analyzer to a long data format
     where each line represents a time point of a trial and columns are channel data.
