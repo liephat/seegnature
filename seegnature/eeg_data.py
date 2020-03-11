@@ -2,33 +2,41 @@ __author__ = 'Mike'
 
 import os
 import numpy as np
+import pandas as pd
 import random
 
 
 class Container:
 
-    def __init__(self, path, data_points, begin, n_classes=2):
+    def __init__(self, path, epoch_size):
+        self.n_classes = 2  # TODO: remove deprecated variable
         self.data = {}
-        self.n_classes = n_classes
+
+        # meta information
+        self.epoch_size = epoch_size
+
         dataset_folders = os.listdir(path)
 
         for dataset in dataset_folders:
-            self.data[dataset] = read_eeg_data_from_folder(dataset, path, data_points, begin, verbose=True)
+            self.data[dataset] = gather_data(dataset, path, epoch_size, verbose=True)
 
     def create_features_and_labels(self, channels, test_size=0.1, one_hot=True):
+        # TODO: revise
         merged_data = {}
 
-        for participant in self.data:
-            for trial in self.data[participant].keys():
-                new_key = participant + '_' + str(trial)
-                merged_data[new_key] = self.data[participant][trial]
+        for dataset in self.data:
+            for trial in self.data[dataset].keys():
+                new_key = dataset + '_' + str(trial)
+                merged_data[new_key] = self.data[dataset][trial]
 
         return self.prepare_features_and_labels(merged_data, channels, test_size, one_hot)
 
     def create_features_and_labels_for_dataset(self, dataset, channels, test_size=0.1, one_hot=True):
+        # TODO: revise
         return self.prepare_features_and_labels(self.data[dataset], channels, test_size, one_hot)
 
     def prepare_features_and_labels(self, data, channels, test_size, one_hot):
+        # TODO: revise
         # get size of testing set
         testing_size = int(test_size * len(data.keys()))
 
@@ -55,21 +63,15 @@ class Container:
 
         return train_features, train_labels, test_features, test_labels
 
-    def merge_data(self, identifier, data, variables):
-        for dataset in self.data:
-            for case in self.data[dataset]:
-                for time_point in self.data[dataset][case]:
-                    for key in data:
-                        if self.data[dataset][case][time_point][identifier[0]] in data[key][identifier[1]]:
-                            for variable in variables:
-                                self.data[dataset][case][time_point][variable] = data[key][variable]
 
     def add_constant(self, dataset, name, constant):
+        # TODO: revise
         for case in self.data[dataset]:
             for time_point in self.data[dataset][case]:
                 self.data[dataset][case][time_point][name] = constant
 
     def add_variable(self, dataset, df, variable):
+        # TODO: revise
         """
         Inserts a variable from a pandas data frame into a dataset of EEG data container.
         :param dataset: Name of dataset from EEG data container
@@ -90,25 +92,24 @@ class Container:
         del self.data[b]
 
 
-def read_eeg_data_from_folder(dataset, datasets_path, data_points, begin, verbose=False):
+def gather_data(dataset, path, epoch_size, verbose=False):
     """
-    Reads ERP data epochs from folder that contains one or more files that are treated as one dataset. One dataset
-    can comprise one or more files that each contain ERP data of e.g. different trial types of one participant (i.e. one
-    dataset corresponds to one participant) or different participants of one experimental condition (i.e. one dataset
+    Reads EEG data epochs from folder that contains one or more files that are treated as one dataset. One dataset
+    can comprise one or more files that each contain EEG data of e.g. different trial types of one dataset (i.e. one
+    dataset corresponds to one dataset) or different datasets of one experimental condition (i.e. one dataset
     corresponds to one experimental condition).
+    :param epoch_size: Number size of epoch
     :param dataset: String ID of dataset
-    :param datasets_path: Folder path to datasets
-    :param data_points: Number of data points that are included in one ERP data epoch
+    :param path: Folder path to datasets
     :param begin: Number begin of ERP data stream in a data file
     :param verbose: Boolean defines the verbosity of data reading process
     :return: Dictionary with dataset IDs as keys and collected data from data files as values
     """
-    dataset_path = os.path.abspath(os.path.join(datasets_path, dataset))
+    path = os.path.abspath(os.path.join(path, dataset))
 
-    dataset_files = os.listdir(dataset_path)
+    dataset_files = os.listdir(path)
 
-    current_trial_id = 0
-    trials_data = {}
+    epochs = pd.DataFrame()
 
     if verbose:
         print("Dataset ID %s, record files:" % dataset)
@@ -116,50 +117,65 @@ def read_eeg_data_from_folder(dataset, datasets_path, data_points, begin, verbos
     for file in dataset_files:
         if file.endswith(".dat"):
 
-            participant_id = guess_participant_id_from_filename(file)
-            target_class = guess_target_class_from_filename(file)
-            congruency = guess_congruency_from_filename(file)
+            dataset_id = guess_dataset_id(file)
+            target_class = guess_target(file)
+            congruency = guess_congruency_info(file)
 
-            file_path = os.path.abspath(os.path.join(dataset_path, file))
-            channels_data = read_data(file_path, data_points, begin)
-            trials_new_data = restructure_data(channels_data, participant_id, target_class, congruency,
-                                               current_trial_id)
+            file_path = os.path.abspath(os.path.join(path, file))
+            epochs_file = read_brainvision_file(file_path)
 
-            current_trial_id = current_trial_id + len(trials_new_data)
             if verbose:
-                print(file + ", " + str(len(trials_new_data)) + " trial(s)")
+                print("> %s, %d trial(s)" % (file, len(epochs_file)/epoch_size))
 
-            trials_data.update(trials_new_data)
+            if not epochs.empty:
+                epochs = pd.concat(epochs, epochs_file, ignore_index=True)
+            else:
+                epochs = epochs_file
+
+    n_epochs = len(epochs)//epoch_size
+
     if verbose:
-        print("Total: %d" % current_trial_id)
+        print("> Total: %d trial(s)" % n_epochs)
     else:
-        print("Dataset ID: %s, record files: %d" % (dataset, current_trial_id))
+        print("Dataset ID: %s, record files: %d" % (dataset, len(dataset_files)))
 
-    return trials_data
+    # get hierarchical dataframe with epochs
+    epochs_dfs = []
+    epochs_index = []
+
+    epochs = epochs.groupby(np.arange(len(epochs))//epoch_size)
+    for k, g in epochs:
+        g.reset_index(drop=True, inplace=True)
+        epochs_dfs.append(g)
+        epochs_index.append(k)
+
+    epochs_trials = pd.concat(epochs_dfs, keys=epochs_index)
+
+    return epochs_trials
 
 
-def guess_target_class_from_filename(filename_in):
+def guess_target(string):
     """
-    Gets target class of participant data file.
-    :param filename_in: File name of generic data format file
+    Guesses target information from string.
+    :param string
     :return: Number code for target class (1 = correct, 0 = error)
     """
-    if filename_in[-5] == "e":
-        target_class = 0
-    elif filename_in[-5] == "c":
-        target_class = 1
+    if string[-5] == "e":
+        target = 0
+    elif string[-5] == "c":
+        target = 1
     else:
-        target_class = None
-    return target_class
+        target = None
+    return target
 
 
-def guess_congruency_from_filename(filename_in):
+def guess_congruency_info(string):
     """
-    Gets congruency type from context specific stimulus code.
-    :param filename_in: File name of generic data format file
+    Guesses congruency type from string.
+    :param string
     :return: Number code for type of congruency (1 = congruent, 0 = not congruent)
     """
-    trial_type = filename_in[-9:-6]
+    trial_type = string[-9:-6]
     if trial_type == str(101):
         congruency = 1
     elif trial_type == str(102):
@@ -173,102 +189,38 @@ def guess_congruency_from_filename(filename_in):
     return congruency
 
 
-def guess_participant_id_from_filename(filename_in):
+def guess_dataset_id(string):
     """
-    Gets participant id from context specific stimulus code.
-    :param filename_in: File name of generic data format file
-    :return: Participant ID
+    Guesses dataset id from string.
+    :param string
+    :return: dataset ID
     """
 
-    return filename_in[0:6]
+    return string[0:6]
 
 
-def read_data(file_path, data_points, begin):
-    """ Reads data from generic data format file (.dat) and creates a dictionary with channel name as key and
-    a list of data_points big chunks as value.
-    :param file_name: File name of generic data format file
-    :param data_points: Number of data points that are included in one ERP data epoch
-    :param begin: Number begin of ERP data stream in a data file
-    :return: Dictionary with channel name as key and list of data_points big chunks which is the
-    size of a trial as value
+def read_brainvision_file(file):
+    """ Reads data from generic data format file (.dat) and creates a pandas dataframe with channels as coumns and
+    voltage values in rows.
+    :param file: File name of generic data format file
+    :return: Dataframe with channels as columns and voltage values in rows
     """
-    data_file = open(file_path, "r")
-    channels = {}
+    data_file = open(file, "r")
+    epochs = {}
     for line in data_file:
-        ch = line[:begin]
+
+        # separate channel keys and values
+        ch_values = line.split(None, 1)
+        ch = ch_values[0]
         ch = ch.strip()
         ch = ch.replace(" ", "_")
 
-        values = line[begin:].split()
+        # add dictionary entry with channel as key and list of voltage values
+        epochs[ch] = ch_values[1].split()
 
-        if not 'hEOG' in ch:
-            channels[ch] = list(chunks(values, data_points))
     data_file.close()
 
-    return channels
-
-
-def restructure_data(trial_data_wide, dataset_id, target_class, congruency, current_trial_id):
-    # TODO: integrate pandas data frame here
-    """
-    Converts wide and generic data format read from generic data format file from brainvision analyzer to a long data format
-    where each line represents a time point of a trial and columns are channel data.
-    :param trial_data_wide: Dictionary with channel name as key and list of trials
-    :param dataset_id: String ID of the dataset
-    :param target_class: Number code for target class (1 = correct, 0 = error)
-    :param congruency: Number code for type of congruency (1 = congruent, 0 = not congruent)
-    :param current_trial_id: Number ID of the current trial of the dataset that can be used when dataset has more than one trial
-    :return: Dictionary with trial number (as key) and dictionaries (as values) with time point (as key) and
-    specific attributes such as trial number, time point, class, congruency types and channels (as values)
-    """
-    trial_data_long = {}
-    for ch in trial_data_wide.keys():
-
-        i = 1
-
-        for trial in trial_data_wide[ch]:
-            # check if there is already an entry for the next trial in trials_tmp_data
-            if (current_trial_id + i) not in trial_data_long:
-                trial_data_long[current_trial_id + i] = {}
-
-            j = 1
-
-            for time_point in trial:
-                if j not in trial_data_long[current_trial_id + i]:
-                    trial_data_long[current_trial_id + i][j] = {}
-                    trial_data_long[current_trial_id + i][j]['ID'] = current_trial_id + i
-                    trial_data_long[current_trial_id + i][j]['Time_point'] = j
-                    trial_data_long[current_trial_id + i][j]['Class'] = target_class
-                    trial_data_long[current_trial_id + i][j]['Congruency'] = congruency
-                    trial_data_long[current_trial_id + i][j]['Participant_ID'] = dataset_id
-
-                time_point = time_point.replace(",", ".")
-                trial_data_long[current_trial_id + i][j][ch] = time_point
-
-                j = j + 1
-
-            i = i + 1
-
-    return trial_data_long
-
-
-def print_trials_data(trials_data):
-    """
-    Prints ERP data.
-    :param trials_data: Dictionary of ERP data.
-    """
-    for trial in trials_data.keys():
-        print(str(trial) + ": ")
-        for time_point, ch in trials_data[trial].iteritems():
-            print(time_point, ch)
-
-
-def chunks(length, size):
-    """
-    Yield successive n-sized chunks from l.
-    """
-    for i in range(0, len(length), size):
-        yield length[i:i + size]
+    return pd.DataFrame(epochs)
 
 
 def make_labels_one_hot(labels, n_classes):
@@ -285,15 +237,3 @@ def make_labels_one_hot(labels, n_classes):
         labels_one_hot.append(label_one_hot)
     labels = np.array(labels_one_hot)
     return labels
-
-
-def merge_two_dicts(x, y):
-    """
-    Merges two dictionaries to one.
-    :param x: Dictionary 1
-    :param y: Dictionary 2
-    :return: Combined dictionary of dictionaries 1 and 2
-    """
-    z = x.copy()
-    z.update(y)
-    return z
