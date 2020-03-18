@@ -18,7 +18,7 @@ class Container:
         dataset_folders = os.listdir(path)
 
         for dataset in dataset_folders:
-            self.data[dataset] = gather_data(dataset, path, epoch_size, verbose=True)
+            self.data[dataset] = gather(dataset, path, epoch_size, verbose=True)
 
     def create_features_and_labels(self, channels, test_size=0.1, one_hot=True):
         # TODO: revise
@@ -63,36 +63,22 @@ class Container:
 
         return train_features, train_labels, test_features, test_labels
 
-
-    def add_constant(self, dataset, name, constant):
-        # TODO: revise
-        for case in self.data[dataset]:
-            for time_point in self.data[dataset][case]:
-                self.data[dataset][case][time_point][name] = constant
-
-    def add_variable(self, dataset, df, variable):
-        # TODO: revise
+    def merge(self, dataset, df):
         """
-        Inserts a variable from a pandas data frame into a dataset of EEG data container.
+        Merges dataset and data frame.
         :param dataset: Name of dataset from EEG data container
-        :param df: Pandas data frame with variable (case in dataset must match index of df)
-        :param variable: Name of variable that will be inserted
-        :return:
+        :param df: Pandas data frame
         """
-        if len(self.data[dataset]) > len(df):
+
+        _df = self.data[dataset]
+
+        if len(_df.groupby(level=0)) > len(df):
             raise Exception("Number of entries df must be greater or equal than number of cases in dataset.")
 
-        for case in self.data[dataset]:
-            for time_point in self.data[dataset][case]:
-                self.data[dataset][case][time_point][variable] = df.loc[case - 1, variable]
-
-    def merge_datasets(self, a, b, name):
-        self.data[name] = merge_two_dicts(self.data[a], self.data[b])
-        del self.data[a]
-        del self.data[b]
+        self.data[dataset] = _df.join(df, how='inner')
 
 
-def gather_data(dataset, path, epoch_size, verbose=False):
+def gather(dataset, path, epoch_size, verbose=False):
     """
     Reads EEG data epochs from folder that contains one or more files that are treated as one dataset. One dataset
     can comprise one or more files that each contain EEG data of e.g. different trial types of one dataset (i.e. one
@@ -101,7 +87,6 @@ def gather_data(dataset, path, epoch_size, verbose=False):
     :param epoch_size: Number size of epoch
     :param dataset: String ID of dataset
     :param path: Folder path to datasets
-    :param begin: Number begin of ERP data stream in a data file
     :param verbose: Boolean defines the verbosity of data reading process
     :return: Dictionary with dataset IDs as keys and collected data from data files as values
     """
@@ -117,15 +102,15 @@ def gather_data(dataset, path, epoch_size, verbose=False):
     for file in dataset_files:
         if file.endswith(".dat"):
 
-            dataset_id = guess_dataset_id(file)
-            target_class = guess_target(file)
-            congruency = guess_congruency_info(file)
-
             file_path = os.path.abspath(os.path.join(path, file))
             epochs_file = read_brainvision_file(file_path)
+            epochs_file['dataset'] = guess_dataset_id(file)
+            epochs_file['target'] = guess_target(file)
+            epochs_file['congruency'] = guess_congruency_info(file)
 
+            n_epochs = len(epochs_file)/epoch_size
             if verbose:
-                print("> %s, %d trial(s)" % (file, len(epochs_file)/epoch_size))
+                print("> %s, %d trial(s)" % (file, n_epochs))
 
             if not epochs.empty:
                 epochs = pd.concat(epochs, epochs_file, ignore_index=True)
@@ -150,6 +135,7 @@ def gather_data(dataset, path, epoch_size, verbose=False):
         epochs_index.append(k)
 
     epochs_trials = pd.concat(epochs_dfs, keys=epochs_index)
+    epochs_trials.index.names = ['Trial', 'Time']
 
     return epochs_trials
 
@@ -200,7 +186,8 @@ def guess_dataset_id(string):
 
 
 def read_brainvision_file(file):
-    """ Reads data from generic data format file (.dat) and creates a pandas dataframe with channels as coumns and
+    """
+    Reads data from generic data format file (.dat) and creates a pandas dataframe with channels as coumns and
     voltage values in rows.
     :param file: File name of generic data format file
     :return: Dataframe with channels as columns and voltage values in rows
