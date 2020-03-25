@@ -32,8 +32,7 @@ def correlate(raw, chs, target, rtype, alpha):
 
 class SeparabilityIndex:
 
-    def __init__(self, name, raw, chs, target, rtype='pearson', desc=None,
-                 alpha=None):
+    def __init__(self, name, raw, chs, target, rtype='pearson', desc=None, alpha=None):
         self.name = name
         self.raw = raw
         self.chs = chs
@@ -49,8 +48,9 @@ class SeparabilityIndex:
         # initialize empty data and features dictionary
         self.features = {}
         self.r_matrix = correlate(raw, chs, target, rtype, alpha)
+        self.heat_map = None
 
-    def make_heatmap(self, cmap=None):
+    def visualize(self, cmap=None, path=None, file_format='png'):
 
         # make default colormap
         if cmap is None:
@@ -64,7 +64,7 @@ class SeparabilityIndex:
         # helper array for pcolormesh
         chs = range(1, len(self.chs) + 1)
 
-        # setup the 2D grid with Numpy
+        # setup the 2D grid
         t, chs = np.meshgrid(t, np.asarray(chs))
 
         # define channel labels
@@ -99,17 +99,14 @@ class SeparabilityIndex:
 
         fig.colorbar(mesh, cax=cax)  # need a colorbar to show the intensity scale
 
-        self.heatmap = plt
+        self.heat_map = plt
 
-    def show_heatmap(self):
-        self.make_heatmap()
-        self.heatmap.show()
-
-    def save_heatmap(self, path, file_format):
-        file = os.path.abspath(os.path.join(path, self.name + '.' + file_format))
-        self.make_heatmap()
-        self.heatmap.savefig(file, format=file_format, dpi=300, bbox_inches='tight')
-        print("Saved separability diagram to " + file)
+        if path is None:
+            self.heat_map.show()
+        else:
+            file = os.path.abspath(os.path.join(path, self.name + '.' + file_format))
+            self.heat_map.savefig(file, format=file_format, dpi=300, bbox_inches='tight')
+            print("Saved separability diagram to " + file)
 
     def pickle(self, path):
         file = os.path.abspath(os.path.join(path, self.name + '.pkl'))
@@ -143,15 +140,15 @@ class SeparabilityIndex:
                     variable_name = str(channel) + "_" + str(begin) + "-" + str(end)
                     self.features[case][variable_name] = avg
 
-    def get_features_and_labels(self, target_variable=None):
+    def get_features_and_labels(self, target=None):
 
         features = self.features
-        if target_variable is None:
-            target_variable = self.target
+        if target is None:
+            target = self.target
 
-        if target_variable in features[1].keys():
+        if target in features[1].keys():
             # stack labels into nparray
-            y = np.hstack((features[case][target_variable] for case in features))
+            y = np.hstack((features[case][target] for case in features))
             y = y.astype(np.float64)
             y = y - 1
 
@@ -165,7 +162,7 @@ class SeparabilityIndex:
         else:
             raise ValueError('Not a valid target variable')
 
-    def save_extracted_features_to_txt(self, path):
+    def save_extracted_features(self, path):
 
         features = self.features
         X = np.vstack((np.hstack(features[case][feature] for feature in features[case].keys()) for case in features))

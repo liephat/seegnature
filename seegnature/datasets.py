@@ -10,7 +10,7 @@ class Container:
 
     def __init__(self, path, epoch_size):
         self.n_classes = 2  # TODO: remove deprecated variable
-        self.data = {}
+        self.datasets = {}
 
         # meta information
         self.epoch_size = epoch_size
@@ -18,22 +18,22 @@ class Container:
         dataset_folders = os.listdir(path)
 
         for dataset in dataset_folders:
-            self.data[dataset] = gather(dataset, path, epoch_size, verbose=True)
+            self.datasets[dataset] = gather(dataset, path, epoch_size, verbose=True)
 
     def create_features_and_labels(self, channels, test_size=0.1, one_hot=True):
         # TODO: revise
         merged_data = {}
 
-        for dataset in self.data:
-            for trial in self.data[dataset].keys():
+        for dataset in self.datasets:
+            for trial in self.datasets[dataset].keys():
                 new_key = dataset + '_' + str(trial)
-                merged_data[new_key] = self.data[dataset][trial]
+                merged_data[new_key] = self.datasets[dataset][trial]
 
         return self.prepare_features_and_labels(merged_data, channels, test_size, one_hot)
 
     def create_features_and_labels_for_dataset(self, dataset, channels, test_size=0.1, one_hot=True):
         # TODO: revise
-        return self.prepare_features_and_labels(self.data[dataset], channels, test_size, one_hot)
+        return self.prepare_features_and_labels(self.datasets[dataset], channels, test_size, one_hot)
 
     def prepare_features_and_labels(self, data, channels, test_size, one_hot):
         # TODO: revise
@@ -70,12 +70,12 @@ class Container:
         :param df: Pandas data frame
         """
 
-        _df = self.data[dataset]
+        _df = self.datasets[dataset]
 
         if len(_df.groupby(level=0)) > len(df):
             raise Exception("Number of entries df must be greater or equal than number of cases in dataset.")
 
-        self.data[dataset] = _df.join(df, how='inner')
+        self.datasets[dataset] = _df.join(df, how='inner')
 
 
 def gather(dataset, path, epoch_size, verbose=False):
@@ -192,7 +192,7 @@ def read_brainvision_file(file):
     :param file: File name of generic data format file
     :return: Dataframe with channels as columns and voltage values in rows
     """
-    data_file = open(file, "r")
+    data_file = open(file, 'r')
     epochs = {}
     for line in data_file:
 
@@ -200,10 +200,10 @@ def read_brainvision_file(file):
         ch_values = line.split(None, 1)
         ch = ch_values[0]
         ch = ch.strip()
-        ch = ch.replace(" ", "_")
+        ch = ch.replace(' ', '_')
 
-        # add dictionary entry with channel as key and list of voltage values
-        epochs[ch] = ch_values[1].split()
+        # add dictionary entry with channel as key and list of voltage values and convert decimal
+        epochs[ch] = ch_values[1].replace(',', '.').split()
 
     data_file.close()
 
