@@ -20,49 +20,6 @@ class Container:
         for dataset in dataset_folders:
             self.datasets[dataset] = gather(dataset, path, epoch_size, verbose=True)
 
-    def create_features_and_labels(self, channels, test_size=0.1, one_hot=True):
-        # TODO: revise
-        merged_data = {}
-
-        for dataset in self.datasets:
-            for trial in self.datasets[dataset].keys():
-                new_key = dataset + '_' + str(trial)
-                merged_data[new_key] = self.datasets[dataset][trial]
-
-        return self.prepare_features_and_labels(merged_data, channels, test_size, one_hot)
-
-    def create_features_and_labels_for_dataset(self, dataset, channels, test_size=0.1, one_hot=True):
-        # TODO: revise
-        return self.prepare_features_and_labels(self.datasets[dataset], channels, test_size, one_hot)
-
-    def prepare_features_and_labels(self, data, channels, test_size, one_hot):
-        # TODO: revise
-        # get size of testing set
-        testing_size = int(test_size * len(data.keys()))
-
-        # shuffle trial keys
-        shuffled_trial_keys = list(data.keys())
-        random.shuffle(shuffled_trial_keys)
-
-        # stack labels into nparray
-        labels = np.hstack((data[trial][1]['Class'] for trial in shuffled_trial_keys))
-
-        # stack features into nparray
-        features = np.vstack((np.hstack(
-            (np.dstack((data[trial][time_point][channel] for channel in channels)) for time_point in
-             data[trial].keys())) for trial in shuffled_trial_keys))
-
-        if one_hot:
-            labels = make_labels_one_hot(labels, self.n_classes)
-
-        train_features = features[:-testing_size]
-        train_labels = labels[:-testing_size]
-
-        test_features = features[-testing_size:]
-        test_labels = labels[-testing_size:]
-
-        return train_features, train_labels, test_features, test_labels
-
     def merge(self, dataset, df):
         """
         Merges dataset and data frame.
