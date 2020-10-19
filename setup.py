@@ -10,7 +10,6 @@ setup(name='seegnature',
       install_requires=[
           'numpy',
           'matplotlib',
-          'tensorflow',
-          'tflearn'
+          'pandas'
       ],
       zip_safe=False)
